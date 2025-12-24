@@ -1,0 +1,61 @@
+#ifndef COMMON_H
+#define COMMON_H
+
+#include <iostream>
+#include <vector>
+#include <random>
+#include <chrono>
+#include <algorithm>
+#include <<iomanip>
+#include <climits>
+using namespace std;
+
+// 边界框结构体（目标检测常用格式）
+struct BoundingBox {
+    float x1;       // 左上角x坐标
+    float y1;       // 左上角y坐标
+    float x2;       // 右下角x坐标
+    float y2;       // 右下角y坐标
+    float confidence;// 置信度（0~1）
+    int label;      // 类别标签（默认0，简化实验）
+
+    // 构造函数
+    BoundingBox(float x1_ = 0, float y1_ = 0, float x2_ = 0, float y2_ = 0, float conf_ = 0)
+        : x1(x1_), y1(y1_), x2(x2_), y2(y2_), confidence(conf_), label(0) {}
+};
+
+// 排序算法函数指针（统一接口）
+typedef void (*SortFunc)(vector<BoundingBox>&, bool (*cmp)(const BoundingBox&, const BoundingBox&));
+
+// 置信度降序比较函数（NMS中需按置信度排序）
+inline bool cmpConfidenceDesc(const BoundingBox& a, const BoundingBox& b) {
+    return a.confidence > b.confidence;
+}
+
+// 随机数生成器（全局静态，确保线程安全与可复现性）
+static random_device rd;
+static mt19937 gen(rd());
+static uniform_real_distribution<> dis_0_1(0.0, 1.0);       // 0~1均匀分布（置信度/位置）
+static normal_distribution<> dis_normal(0.7, 0.15);         // 正态分布（聚集置信度，均值0.7，方差0.15）
+static uniform_int_distribution<> dis_size(20, 100);        // 边界框大小（20~100像素）
+
+// 计算两个边界框的IoU（交并比）
+inline float calculateIoU(const BoundingBox& a, const BoundingBox& b) {
+    // 计算交集区域
+    float interX1 = max(a.x1, b.x1);
+    float interY1 = max(a.y1, b.y1);
+    float interX2 = min(a.x2, b.x2);
+    float interY2 = min(a.y2, b.y2);
+
+    if (interX1 >= interX2 || interY1 >= interY2) return 0.0f; // 无交集
+
+    // 计算面积
+    float interArea = (interX2 - interX1) * (interY2 - interY1);
+    float areaA = (a.x2 - a.x1) * (a.y2 - a.y1);
+    float areaB = (b.x2 - b.x1) * (b.y2 - b.y1);
+
+    // IoU = 交集面积 / 并集面积
+    return interArea / (areaA + areaB - interArea);
+}
+
+#endif // COMMON_H
