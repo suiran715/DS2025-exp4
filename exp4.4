@@ -1,0 +1,121 @@
+#include "common.h"
+#include "sort_algorithms.h"
+#include "data_nms.h"
+
+// 测试排序算法性能（返回运行时间，单位：毫秒）
+double testSortPerformance(SortFunc sortFunc, vector<BoundingBox> bboxes, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+    // 记录开始时间
+    auto start = chrono::high_resolution_clock::now();
+
+    // 执行排序
+    sortFunc(bboxes, cmp);
+
+    // 记录结束时间
+    auto end = chrono::high_resolution_clock::now();
+    chrono::duration<double, milli> duration = end - start;
+
+    return duration.count();
+}
+
+// 测试NMS整体性能（包含排序步骤）
+double testNMSPerformance(SortFunc sortFunc, vector<BoundingBox> bboxes, float iouThreshold = 0.5f) {
+    auto start = chrono::high_resolution_clock::now();
+
+    // 1. 排序（NMS核心步骤之一）
+    sortFunc(bboxes, cmpConfidenceDesc);
+    // 2. 执行NMS
+    auto result = nms(bboxes, iouThreshold);
+
+    auto end = chrono::high_resolution_clock::now();
+    chrono::duration<double, milli> duration = end - start;
+
+    return duration.count();
+}
+
+// 主测试函数（遍历所有场景测试）
+void runAllTests() {
+    // 测试配置
+    vector<int> bboxSizes = {100, 500, 1000, 3000, 5000, 10000}; // 数据规模
+    vector<string> distributions = {"随机分布", "聚集分布"};     // 数据分布
+    vector<pair<string, SortFunc>> sortAlgorithms = {             // 排序算法列表
+        {"冒泡排序", bubbleSort},
+        {"快速排序", quickSort},
+        {"归并排序", mergeSort},
+        {"堆排序", heapSort}
+    };
+
+    // 输出排序算法单独性能测试结果
+    cout << "===================================== 排序算法性能测试（单位：ms） =====================================" << endl;
+    cout << setw(10) << "数据规模" << setw(10) << "数据分布" << setw(12) << "冒泡排序" << setw(12) << "快速排序" << setw(12) << "归并排序" << setw(12) << "堆排序" << endl;
+    cout << "========================================================================================================" << endl;
+
+    // 遍历所有测试场景
+    for (int size : bboxSizes) {
+        for (const string& dist : distributions) {
+            // 生成测试数据（深拷贝避免修改原数据）
+            vector<BoundingBox> bboxes;
+            if (dist == "随机分布") {
+                bboxes = generateRandomBBoxes(size);
+            } else {
+                bboxes = generateClusteredBBoxes(size);
+            }
+
+            // 存储每种算法的运行时间（多次测试取平均值，此处取3次）
+            vector<double> times(4, 0.0);
+            const int testTimes = 3;
+            for (int t = 0; t < testTimes; ++t) {
+                for (int i = 0; i < 4; ++i) {
+                    vector<BoundingBox> bboxesCopy = bboxes;
+                    times[i] += testSortPerformance(sortAlgorithms[i].second, bboxesCopy, cmpConfidenceDesc);
+                }
+            }
+            // 计算平均值
+            for (int i = 0; i < 4; ++i) times[i] /= testTimes;
+
+            // 输出结果
+            cout << setw(10) << size << setw(10) << dist;
+            for (double time : times) {
+                cout << setw(12) << fixed << setprecision(3) << time;
+            }
+            cout << endl;
+        }
+    }
+
+    // 输出NMS整体性能测试结果
+    cout << "\n===================================== NMS算法整体性能测试（单位：ms） =====================================" << endl;
+    cout << setw(10) << "数据规模" << setw(10) << "数据分布" << setw(12) << "冒泡排序+NMS" << setw(12) << "快速排序+NMS" << setw(12) << "归并排序+NMS" << setw(12) << "堆排序+NMS" << endl;
+    cout << "==========================================================================================================" << endl;
+
+    for (int size : bboxSizes) {
+        for (const string& dist : distributions) {
+            vector<BoundingBox> bboxes;
+            if (dist == "随机分布") {
+                bboxes = generateRandomBBoxes(size);
+            } else {
+                bboxes = generateClusteredBBoxes(size);
+            }
+
+            vector<double> nmsTimes(4, 0.0);
+            const int testTimes = 3;
+            for (int t = 0; t < testTimes; ++t) {
+                for (int i = 0; i < 4; ++i) {
+                    vector<BoundingBox> bboxesCopy = bboxes;
+                    nmsTimes[i] += testNMSPerformance(sortAlgorithms[i].second, bboxesCopy);
+                }
+            }
+            for (int i = 0; i < 4; ++i) nmsTimes[i] /= testTimes;
+
+            cout << setw(10) << size << setw(10) << dist;
+            for (double time : nmsTimes) {
+                cout << setw(12) << fixed << setprecision(3) << time;
+            }
+            cout << endl;
+        }
+    }
+}
+
+// 主函数
+int main() {
+    runAllTests();
+    return 0;
+}
