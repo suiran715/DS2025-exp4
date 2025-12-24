@@ -1,0 +1,76 @@
+#ifndef DATA_NMS_H
+#define DATA_NMS_H
+
+#include "common.h"
+
+// 1. 数据生成模块
+// 生成随机分布的边界框数据
+vector<BoundingBox> generateRandomBBoxes(int num, int imgWidth = 640, int imgHeight = 480) {
+    vector<BoundingBox> bboxes;
+    bboxes.reserve(num);
+    for (int i = 0; i < num; ++i) {
+        // 随机生成左上角坐标（确保边界框不超出图像）
+        float w = dis_size(gen);
+        float h = dis_size(gen);
+        float x1 = dis_0_1(gen) * (imgWidth - w);
+        float y1 = dis_0_1(gen) * (imgHeight - h);
+        float x2 = x1 + w;
+        float y2 = y1 + h;
+        // 随机置信度（0~1）
+        float conf = dis_0_1(gen);
+        bboxes.emplace_back(x1, y1, x2, y2, conf);
+    }
+    return bboxes;
+}
+
+// 生成聚集分布的边界框数据（集中在图像中心区域）
+vector<BoundingBox> generateClusteredBBoxes(int num, int imgWidth = 640, int imgHeight = 480) {
+    vector<BoundingBox> bboxes;
+    bboxes.reserve(num);
+    // 中心区域：(imgWidth/4 ~ 3*imgWidth/4, imgHeight/4 ~ 3*imgHeight/4)
+    float centerX = imgWidth / 2.0f;
+    float centerY = imgHeight / 2.0f;
+    float clusterRadiusW = imgWidth / 4.0f; // 宽度方向聚集半径
+    float clusterRadiusH = imgHeight / 4.0f; // 高度方向聚集半径
+
+    for (int i = 0; i < num; ++i) {
+        // 聚集区域内随机生成左上角坐标
+        float w = dis_size(gen);
+        float h = dis_size(gen);
+        float x1 = centerX - clusterRadiusW + dis_0_1(gen) * (2 * clusterRadiusW - w);
+        float y1 = centerY - clusterRadiusH + dis_0_1(gen) * (2 * clusterRadiusH - h);
+        float x2 = x1 + w;
+        float y2 = y1 + h;
+        // 置信度正态分布（截断到0~1）
+        float conf = clamp(dis_normal(gen), 0.0, 1.0);
+        bboxes.emplace_back(x1, y1, x2, y2, conf);
+    }
+    return bboxes;
+}
+
+// 2. NMS算法实现
+// 基础NMS算法（输入排序后的边界框，IoU阈值默认0.5）
+vector<BoundingBox> nms(vector<BoundingBox> bboxes, float iouThreshold = 0.5f) {
+    vector<BoundingBox> result;
+    if (bboxes.empty()) return result;
+
+    while (!bboxes.empty()) {
+        // 选择置信度最高的边界框加入结果
+        BoundingBox top = bboxes[0];
+        result.push_back(top);
+
+        // 筛选与top IoU小于阈值的边界框
+        vector<BoundingBox> remaining;
+        for (size_t i = 1; i < bboxes.size(); ++i) {
+            if (calculateIoU(top, bboxes[i]) < iouThreshold) {
+                remaining.push_back(bboxes[i]);
+            }
+        }
+
+        bboxes = remaining;
+    }
+
+    return result;
+}
+
+#endif // DATA_NMS_H
