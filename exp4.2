@@ -1,0 +1,121 @@
+#ifndef SORT_ALGORITHMS_H
+#define SORT_ALGORITHMS_H
+
+#include "common.h"
+
+// 1. 冒泡排序（Bubble Sort）
+// 稳定排序，时间复杂度O(n²)，空间复杂度O(1)
+void bubbleSort(vector<BoundingBox>& arr, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+    int n = arr.size();
+    for (int i = 0; i < n - 1; ++i) {
+        bool swapped = false;
+        for (int j = 0; j < n - i - 1; ++j) {
+            if (cmp(arr[j + 1], arr[j])) { // 按自定义规则交换
+                swap(arr[j], arr[j + 1]);
+                swapped = true;
+            }
+        }
+        if (!swapped) break; // 无交换则提前退出
+    }
+}
+
+// 2. 快速排序（Quick Sort）
+// 不稳定排序，平均时间复杂度O(nlogn)，最坏O(n²)，空间复杂度O(logn)
+namespace QuickSort {
+    int partition(vector<BoundingBox>& arr, int low, int high, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+        BoundingBox pivot = arr[high]; // 基准元素（取末尾）
+        int i = low - 1;               // 小于基准的区域边界
+        for (int j = low; j < high; ++j) {
+            if (cmp(arr[j], pivot)) { // 按规则判断是否放入小于基准区域
+                ++i;
+                swap(arr[i], arr[j]);
+            }
+        }
+        swap(arr[i + 1], arr[high]); // 基准元素归位
+        return i + 1;
+    }
+
+    void quickSortRecursive(vector<BoundingBox>& arr, int low, int high, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+        if (low < high) {
+            int pi = partition(arr, low, high, cmp);
+            quickSortRecursive(arr, low, pi - 1, cmp);  // 左子数组
+            quickSortRecursive(arr, pi + 1, high, cmp); // 右子数组
+        }
+    }
+}
+
+void quickSort(vector<BoundingBox>& arr, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+    QuickSort::quickSortRecursive(arr, 0, arr.size() - 1, cmp);
+}
+
+// 3. 归并排序（Merge Sort）
+// 稳定排序，时间复杂度O(nlogn)，空间复杂度O(n)
+namespace MergeSort {
+    void merge(vector<BoundingBox>& arr, int left, int mid, int right, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+        int n1 = mid - left + 1;
+        int n2 = right - mid;
+        // 临时数组
+        vector<BoundingBox> L(arr.begin() + left, arr.begin() + left + n1);
+        vector<BoundingBox> R(arr.begin() + mid + 1, arr.begin() + mid + 1 + n2);
+
+        int i = 0, j = 0, k = left;
+        // 合并两个有序数组
+        while (i < n1 && j < n2) {
+            if (cmp(L[i], R[j])) {
+                arr[k++] = L[i++];
+            } else {
+                arr[k++] = R[j++];
+            }
+        }
+        // 拷贝剩余元素
+        while (i < n1) arr[k++] = L[i++];
+        while (j < n2) arr[k++] = R[j++];
+    }
+
+    void mergeSortRecursive(vector<BoundingBox>& arr, int left, int right, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+        if (left < right) {
+            int mid = left + (right - left) / 2; // 避免溢出
+            mergeSortRecursive(arr, left, mid, cmp);
+            mergeSortRecursive(arr, mid + 1, right, cmp);
+            merge(arr, left, mid, right, cmp);
+        }
+    }
+}
+
+void mergeSort(vector<BoundingBox>& arr, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+    MergeSort::mergeSortRecursive(arr, 0, arr.size() - 1, cmp);
+}
+
+// 4. 堆排序（Heap Sort）
+// 不稳定排序，时间复杂度O(nlogn)，空间复杂度O(1)
+namespace HeapSort {
+    void heapify(vector<BoundingBox>& arr, int n, int i, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+        int largest = i;    // 根节点
+        int l = 2 * i + 1;  // 左子节点
+        int r = 2 * i + 2;  // 右子节点
+
+        // 构建大顶堆（按自定义规则判断"大"）
+        if (l < n && cmp(arr[l], arr[largest])) largest = l;
+        if (r < n && cmp(arr[r], arr[largest])) largest = r;
+
+        if (largest != i) {
+            swap(arr[i], arr[largest]);
+            heapify(arr, n, largest, cmp); // 递归调整子堆
+        }
+    }
+}
+
+void heapSort(vector<BoundingBox>& arr, bool (*cmp)(const BoundingBox&, const BoundingBox&)) {
+    int n = arr.size();
+    // 构建大顶堆（从最后一个非叶子节点开始）
+    for (int i = n / 2 - 1; i >= 0; --i) {
+        HeapSort::heapify(arr, n, i, cmp);
+    }
+    // 堆排序：依次提取堆顶元素
+    for (int i = n - 1; i > 0; --i) {
+        swap(arr[0], arr[i]); // 堆顶（最大元素）移至末尾
+        HeapSort::heapify(arr, i, 0, cmp); // 调整剩余元素为大顶堆
+    }
+}
+
+#endif // SORT_ALGORITHMS_H
